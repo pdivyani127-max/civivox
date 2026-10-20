@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { isAdmin } from '@/lib/auth';
+import { guardEvent } from '@/lib/auth';
 import { recordParking } from '@/lib/history';
 import { parkingStatus } from '@/lib/insights';
 import { RESOURCE_TYPES } from '@/lib/config';
@@ -8,10 +8,10 @@ const DEFAULT_NOTE = { crowd: 'Low activity', parking: 'Free slots', waste: 'Emp
 
 // Create a new card (resource) inside an area
 export async function POST(req) {
-  if (!(await isAdmin())) return Response.json({ error: 'Not logged in' }, { status: 401 });
   const b = await req.json().catch(() => ({}));
   const zone = db.prepare('SELECT * FROM zones WHERE id = ?').get(Number(b.zoneId));
   if (!zone) return Response.json({ error: 'Area not found' }, { status: 404 });
+  const g = await guardEvent(zone.event_id); if (g.error) return g.error;
   if (!RESOURCE_TYPES[b.type]) return Response.json({ error: 'Unknown card type' }, { status: 400 });
   const label = String(b.label || '').trim().slice(0, 60);
   if (!label) return Response.json({ error: 'Card name is required' }, { status: 400 });

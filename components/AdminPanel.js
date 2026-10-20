@@ -2,6 +2,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { RESOURCE_TYPES, STATUS_LABELS, PRESETS, isSensorCard } from '@/lib/config';
 import { tasks } from '@/lib/insights';
+import QrPanel from './QrPanel';
+import OrganizerAccounts from './OrganizerAccounts';
+import { noFillName, noFillPassword } from '@/lib/noautofill';
 
 const call = (method, url, body) => fetch(url, {
   method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
@@ -19,7 +22,7 @@ function NoteBox({ resource, save }) {
   );
 }
 
-function ResourceControl({ r, reload }) {
+export function ResourceControl({ r, reload, canRemove = true }) {
   const t = RESOURCE_TYPES[r.type] || { icon: '•', label: r.type };
   const save = async (changes) => { await post(`/api/admin/resources/${r.id}`, changes); reload(); };
   const remove = async () => {
@@ -32,7 +35,7 @@ function ResourceControl({ r, reload }) {
         <div className="res-top"><span>{t.icon} {r.label}</span><span className="pill">{r.status === 'green' ? 'Online' : 'Offline'}</span></div>
         <div>{r.note}</div>
         <div className="muted tiny">Updated automatically from the Arduino readings</div>
-        <button className="linkbtn" onClick={remove}>Remove card</button>
+        {canRemove && <button className="linkbtn" onClick={remove}>Remove card</button>}
       </div>
     );
   }
@@ -63,7 +66,7 @@ function ResourceControl({ r, reload }) {
       <div className="muted tiny">
         {r.source === 'sim' ? 'Simulated · ' : ''}Last updated {new Date(r.updated_at).toLocaleTimeString()}
       </div>
-      <button className="linkbtn" onClick={remove}>Remove card</button>
+      {canRemove && <button className="linkbtn" onClick={remove}>Remove card</button>}
     </div>
   );
 }
@@ -99,13 +102,18 @@ function AddCard({ zone, reload }) {
   );
 }
 
-export default function AdminPanel({ events: initialEvents, initial }) {
+export default function AdminPanel({ events: initialEvents, initial, role = 'admin', account = { name: 'Site owner', status: 'approved' } }) {
+  const isOwner = role === 'admin';
   const [events, setEvents] = useState(initialEvents);
   const [eventId, setEventId] = useState(initial.event.id);
   const [snap, setSnap] = useState(initial);
   const [msg, setMsg] = useState('');
   const [alerts, setAlerts] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
+  const [vols, setVols] = useState([]);
+  const [vol, setVol] = useState({ name: '', password: '', zoneId: '' });
+  const [volMsg, setVolMsg] = useState(null);
+  const [notes, setNotes] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [soundOn, setSoundOn] = useState(false);
   const [simOn, setSimOn] = useState(false);
@@ -141,6 +149,10 @@ export default function AdminPanel({ events: initialEvents, initial }) {
       }
       const tr = await fetch(`/api/admin/tasks?eventId=${eventId}`, { cache: 'no-store' });
       if (tr.ok) setMyTasks(await tr.json());
+      const vr = await fetch(`/api/admin/volunteers?eventId=${eventId}`, { cache: 'no-store' });
+      if (vr.ok) setVols(await vr.json());
+      const nr = await fetch(`/api/notes?eventId=${eventId}`, { cache: 'no-store' });
+      if (nr.ok) setNotes(await nr.json());
     } catch {}
   }, [eventId]);
 
@@ -154,7 +166,7 @@ export default function AdminPanel({ events: initialEvents, initial }) {
     return () => clearInterval(t);
   }, [simOn, eventId, reload]);
 
-  const refreshEvents = async () => { const r = await fetch('/api/events', { cache: 'no-store' }); const list = await r.json(); setEvents(list); return list; };
+  const refreshEvents = async () => { const r = await fetch('/api/admin/events', { cache: 'no-store' }); const list = await r.json(); setEvents(list); return list; };
   const createEvent = async () => {
     const res = await post('/api/admin/events', ev);
     const data = await res.json();
@@ -168,6 +180,11 @@ export default function AdminPanel({ events: initialEvents, initial }) {
     if (!res.ok) return setErr((await res.json()).error || 'Could not delete');
     setErr(''); const list = await refreshEvents(); setEventId(list[0].id);
   };
+  const resetDemo = async () => {
+    if (!confirm('Reset EVERYTHING to the sample data? All events, areas, cards and tasks you added will be deleted.')) return;
+    await post('/api/admin/reset', {});
+    const list = await refreshEvents(); setEventId(list[0].id); setErr(''); reload();
+  };
   const addZone = async () => {
     const res = await post('/api/admin/zones', { eventId, name: zoneName, kind: zoneKind });
     if (!res.ok) return setErr((await res.json()).error || 'Could not add area');
@@ -177,6 +194,21 @@ export default function AdminPanel({ events: initialEvents, initial }) {
     if (!confirm(`Delete the area "${z.name}" and all its cards?`)) return;
     await call('DELETE', `/api/admin/zones/${z.id}`); reload();
   };
+  const addVolunteer = async () => {
+    setVolMsg(null);
+    try {
+      const res = await post('/api/admin/volunteers', vol);
+      let data = {};
+      try { data = await res.json(); } catch {}
+      if (!res.ok) return setVolMsg({ ok: false, text: data.error || 'Could not add the volunteer (server error). Stop the site and run npm run dev again.' });
+      const areaName = snap.zones.find(z => z.id === Number(vol.zoneId))?.name || 'the area';
+      setVolMsg({ ok: true, text: `Added ${vol.name.trim()} to ${areaName}.` });
+      setVol({ name: '', password: '', zoneId: '' });
+      reload();
+    } catch { setVolMsg({ ok: false, text: 'Could not reach the server. Is the site still running?' }); }
+  };
+  const dismissNote = async (n) => { await call('DELETE', `/api/notes/${n.id}`); reload(); };
+  const removeVolunteer = async (v) => { if (confirm(`Remove volunteer "${v.name}"?`)) { await call('DELETE', `/api/admin/volunteers/${v.id}`); reload(); } };
   const addTask = async () => { await post('/api/admin/tasks', { eventId, text: newTask }); setNewTask(''); reload(); };
   const toggleTask = async (t) => { await post(`/api/admin/tasks/${t.id}`, { done: !t.done }); reload(); };
   const removeTask = async (t) => { await call('DELETE', `/api/admin/tasks/${t.id}`); reload(); };
@@ -191,13 +223,18 @@ export default function AdminPanel({ events: initialEvents, initial }) {
   return (
     <>
       <div className="row between">
-        <h1>Admin panel</h1>
+        <div>
+          <h1>{isOwner ? 'Site owner panel' : 'Organizer panel'}</h1>
+          <div className="muted">{account.name}</div>
+        </div>
         <div className="row">
           <button className={`btn ${simOn ? 'primary' : ''}`} onClick={() => setSimOn(!simOn)}>{simOn ? '▶ Simulation: ON' : '⏸ Simulation: OFF'}</button>
           <button className="btn" onClick={toggleSound}>{soundOn ? '🔔 Alert sound: ON' : '🔕 Alert sound: OFF'}</button>
           <button className="btn" onClick={logout}>Log out</button>
         </div>
       </div>
+      {account.status === 'pending' && <div className="pending">⏳ Your account is waiting for approval. You can set everything up, but visitors cannot see your events yet.</div>}
+      {isOwner && <OrganizerAccounts />}
       {simOn && <div className="offline">Simulation is ON: parking, bins, power and crowd levels change with fake data (labelled "Simulated"). Turn it off for real use.</div>}
 
       {openAlerts.length > 0 && (
@@ -213,10 +250,12 @@ export default function AdminPanel({ events: initialEvents, initial }) {
       <div className="row">
         <label>Event:&nbsp;</label>
         <select value={eventId} onChange={e => setEventId(Number(e.target.value))}>
-          {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          {events.map(e => <option key={e.id} value={e.id}>{e.name}{e.date ? ` · ${e.date}` : ''}</option>)}
         </select>
         <a className="back" href={`/event/${eventId}`} target="_blank">Open visitor page ↗</a>
       </div>
+
+      <QrPanel eventId={eventId} eventName={snap.event.name} />
 
       <details className="card manage" open={manageOpen} onToggle={e => setManageOpen(e.currentTarget.open)}>
         <summary>⚙️ Manage events and areas</summary>
@@ -240,7 +279,10 @@ export default function AdminPanel({ events: initialEvents, initial }) {
           </select>
           <button className="btn primary" disabled={!zoneName.trim()} onClick={addZone}>Add area</button>
         </div>
-        <div className="row"><button className="btn danger small" onClick={deleteEvent}>Delete this event</button></div>
+        <div className="row">
+          <button className="btn danger small" onClick={deleteEvent}>Delete this event</button>
+          {isOwner && <button className="btn danger small" onClick={resetDemo}>Reset everything to sample data</button>}
+        </div>
       </details>
 
       <section className="card todo">
@@ -263,6 +305,44 @@ export default function AdminPanel({ events: initialEvents, initial }) {
             onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && newTask.trim() && addTask()} />
           <button className="btn primary" disabled={!newTask.trim()} onClick={addTask}>Add task</button>
         </div>
+      </section>
+
+      <section className="card volunteers">
+        <h2>👥 Volunteers ({vols.length})</h2>
+        <p className="muted tiny">A volunteer can update only the cards in their own area. They log in on this same /admin page using "I'm a volunteer".</p>
+        {vols.length === 0 ? <div className="muted">No volunteers added yet.</div> : (
+          <ul className="mytasks">
+            {vols.map(v => (
+              <li key={v.id}><span>👤 <b>{v.name}</b> → {v.zone}</span>
+                <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => removeVolunteer(v)}>Remove</button></li>
+            ))}
+          </ul>
+        )}
+        <h3 className="tiny muted" style={{ marginTop: 14 }}>Add a volunteer</h3>
+        <div className="row">
+          <input name="new-volunteer-name" {...noFillName} value={vol.name} maxLength={40} placeholder="Volunteer name" onChange={e => setVol({ ...vol, name: e.target.value })} />
+          <input name="new-volunteer-secret" type="password" {...noFillPassword} value={vol.password} placeholder="Password (4+ characters)" onChange={e => setVol({ ...vol, password: e.target.value })} />
+          <select value={vol.zoneId} onChange={e => setVol({ ...vol, zoneId: e.target.value })}>
+            <option value="">Choose area</option>
+            {snap.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+          </select>
+          <button className="btn primary" disabled={!vol.name.trim() || vol.password.length < 4 || !vol.zoneId} onClick={addVolunteer}>Add volunteer</button>
+        </div>
+        {volMsg && <div className={volMsg.ok ? 'okmsg' : 'err'}>{volMsg.text}</div>}
+      </section>
+
+      <section className="card volunteers">
+        <h2>💬 Messages from volunteers ({notes.length})</h2>
+        {notes.length === 0 ? <div className="muted">No messages yet. Volunteers can type notes on their own panel.</div> : (
+          <ul className="mytasks">
+            {notes.map(n => (
+              <li key={n.id}>
+                <span><b>{n.author}</b> · {n.zone} · <span className="muted tiny">{new Date(n.created_at).toLocaleTimeString()}{n.for_visitors ? ' · visible to visitors' : ''}</span><br />{n.text}</span>
+                <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => dismissNote(n)}>Dismiss</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card zone">

@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { isAdmin } from '@/lib/auth';
+import { getSession, canManageEvent, guardEvent } from '@/lib/auth';
 import { recordParking } from '@/lib/history';
 import { deleteResource } from '@/lib/manage';
 import { STATUS_NOTES } from '@/lib/config';
@@ -14,11 +14,16 @@ function parkingStatus(free, capacity) {
 }
 
 export async function POST(req, { params }) {
-  if (!(await isAdmin())) return Response.json({ error: 'Not logged in' }, { status: 401 });
+  const session = await getSession(); // admins can update anything, volunteers only their own area
+  if (!session) return Response.json({ error: 'Not logged in' }, { status: 401 });
   const { id } = await params;
   const b = await req.json().catch(() => ({}));
   const cur = db.prepare('SELECT * FROM resources WHERE id = ?').get(Number(id));
   if (!cur) return Response.json({ error: 'Not found' }, { status: 404 });
+  if (session.role === 'volunteer' && cur.zone_id !== session.zoneId)
+    return Response.json({ error: 'This is not your area' }, { status: 403 });
+  if (session.role !== 'volunteer' && !canManageEvent(session, cur.event_id))
+    return Response.json({ error: 'You cannot manage this event' }, { status: 403 });
 
   let value = cur.value ?? null;
   if (b.value !== undefined && b.value !== null) {
@@ -40,8 +45,10 @@ export async function POST(req, { params }) {
 }
 
 export async function DELETE(_req, { params }) {
-  if (!(await isAdmin())) return Response.json({ error: 'Not logged in' }, { status: 401 });
   const { id } = await params;
+  const r = db.prepare('SELECT event_id FROM resources WHERE id = ?').get(Number(id));
+  if (!r) return Response.json({ ok: true });
+  const g = await guardEvent(r.event_id); if (g.error) return g.error;
   deleteResource(Number(id));
   return Response.json({ ok: true });
 }

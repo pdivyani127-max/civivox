@@ -32,7 +32,7 @@ export default function LiveStatus({ eventId, initial }) {
   const tips = suggestions(zones);
   return (
     <>
-      <a href="/" className="back">← All events</a>
+      <a href="/events" className="back">← All events</a>
       <h1>{event.name}</h1>
       <div className="muted">{event.venue} · {event.date}</div>
 
@@ -52,6 +52,9 @@ export default function LiveStatus({ eventId, initial }) {
       {zones.map(z => (
         <section key={z.id} id={`zone-${z.id}`} className="zone">
           <h2>{z.name}</h2>
+          {(z.notes || []).map(n => (
+            <div key={n.id} className="znote">📝 {n.text} <span className="muted tiny">· {minutesAgo(n.created_at, now) === 0 ? 'just now' : `${minutesAgo(n.created_at, now)} min ago`}</span></div>
+          ))}
           <div className="grid">
             {z.resources.map(r => {
               const age = minutesAgo(r.updated_at, now);

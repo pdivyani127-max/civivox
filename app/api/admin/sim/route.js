@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { isAdmin } from '@/lib/auth';
+import { guardEvent } from '@/lib/auth';
 import { recordParking } from '@/lib/history';
 import { parkingStatus } from '@/lib/insights';
 import { STATUS_NOTES } from '@/lib/config';
@@ -10,8 +10,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const ORDER = ['green', 'yellow', 'red'];
 
 export async function POST(req) {
-  if (!(await isAdmin())) return Response.json({ error: 'Not logged in' }, { status: 401 });
   const { eventId } = await req.json().catch(() => ({}));
+  const g = await guardEvent(eventId); if (g.error) return g.error;
   const rows = db.prepare('SELECT * FROM resources WHERE event_id = ?').all(Number(eventId || 1));
   const now = new Date().toISOString();
   const upd = db.prepare('UPDATE resources SET status = ?, value = ?, note = ?, source = ?, updated_at = ? WHERE id = ?');
