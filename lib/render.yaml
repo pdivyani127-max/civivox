@@ -1,0 +1,17 @@
+# Render.com blueprint: lets you put the site online for free (see README, "Put it online")
+services:
+  - type: web
+    name: civivox
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false            # you type your own password in Render when you deploy
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TELEMETRY_KEY
+        generateValue: true
+      - key: NEXT_PUBLIC_STALE_MINUTES
+        value: "1440"          # keep demo cards coloured instead of grey for a day

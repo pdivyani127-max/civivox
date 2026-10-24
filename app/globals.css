@@ -263,3 +263,7 @@ h1, h2 { font-family:var(--serif); font-weight:600; letter-spacing:.005em; }
   font-family:var(--serif); font-size:1.05rem; font-weight:600; cursor:pointer; box-shadow:0 3px 0 rgba(38,50,74,.22); transition:transform .15s, box-shadow .15s; }
 .back-btn svg { width:20px; height:20px; transition:transform .2s; } .back-btn:hover { transform:translateY(1px) rotate(-1.5deg); box-shadow:0 1px 0 rgba(38,50,74,.22); } .back-btn:hover svg { transform:translateX(-3px); }
 @media (max-width:480px) { .back-btn span { display:none; } .back-btn { padding:6px 9px; } }
+
+/* event dropdown inside each dashboard box */
+.pick { display:flex; align-items:center; gap:8px; margin:4px 0 12px; flex-wrap:wrap; }
+.pick label { font-size:.9rem; color:#4a5875; font-weight:600; } .pick select { flex:1; min-width:180px; max-width:420px; }

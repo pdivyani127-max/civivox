@@ -13,6 +13,10 @@ export default function OrganizerAccounts() {
     await fetch(`/api/admin/organizers/${o.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
     load();
   };
+  const setAll = async (o, allEvents) => {
+    await fetch(`/api/admin/organizers/${o.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allEvents }) });
+    load();
+  };
   const remove = async (o) => {
     if (!confirm(`Remove organizer "${o.name}" and all of their events?`)) return;
     await fetch(`/api/admin/organizers/${o.id}`, { method: 'DELETE' }); load();
@@ -31,6 +35,10 @@ export default function OrganizerAccounts() {
                 ? <a href={`/api/admin/letters/${o.id}`} target="_blank">View letter ({o.letterName})</a>
                 : o.demoLetter ? 'Sample letter (demo)' : 'No letter'}
             </div>
+            <label className="tiny" style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+              <input type="checkbox" style={{ flex: 'none', minWidth: 0 }} checked={!!o.allEvents} onChange={e => setAll(o, e.target.checked)} />
+              Can manage <b>all events</b>, not only their own
+            </label>
           </div>
           {o.status !== 'approved' && <button className="btn small" onClick={() => setStatus(o, 'approved')}>Approve</button>}
           {o.status !== 'rejected' && <button className="btn small" onClick={() => setStatus(o, 'rejected')}>Reject</button>}

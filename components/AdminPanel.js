@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { RESOURCE_TYPES, STATUS_LABELS, PRESETS, isSensorCard } from '@/lib/config';
-import { tasks } from '@/lib/insights';
 import QrPanel from './QrPanel';
 import OrganizerAccounts from './OrganizerAccounts';
-import { noFillName, noFillPassword } from '@/lib/noautofill';
+import TasksSection from './TasksSection';
+import VolunteersSection from './VolunteersSection';
+import MessagesSection from './MessagesSection';
+import BroadcastSection from './BroadcastSection';
 
 const call = (method, url, body) => fetch(url, {
   method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
@@ -107,20 +109,15 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
   const [events, setEvents] = useState(initialEvents);
   const [eventId, setEventId] = useState(initial.event.id);
   const [snap, setSnap] = useState(initial);
-  const [msg, setMsg] = useState('');
   const [alerts, setAlerts] = useState([]);
-  const [myTasks, setMyTasks] = useState([]);
-  const [vols, setVols] = useState([]);
-  const [vol, setVol] = useState({ name: '', password: '', zoneId: '' });
-  const [volMsg, setVolMsg] = useState(null);
-  const [notes, setNotes] = useState([]);
-  const [newTask, setNewTask] = useState('');
   const [soundOn, setSoundOn] = useState(false);
   const [simOn, setSimOn] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [ev, setEv] = useState({ name: '', venue: '', date: '', description: '' });
   const [zoneName, setZoneName] = useState('');
   const [zoneKind, setZoneKind] = useState('hall');
+  const [tpl, setTpl] = useState('garba');
+  const [tplMsg, setTplMsg] = useState(null);
   const [err, setErr] = useState('');
   const lastCount = useRef(null);
   const soundRef = useRef(false);
@@ -147,12 +144,6 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
         lastCount.current = open;
         setAlerts(list);
       }
-      const tr = await fetch(`/api/admin/tasks?eventId=${eventId}`, { cache: 'no-store' });
-      if (tr.ok) setMyTasks(await tr.json());
-      const vr = await fetch(`/api/admin/volunteers?eventId=${eventId}`, { cache: 'no-store' });
-      if (vr.ok) setVols(await vr.json());
-      const nr = await fetch(`/api/notes?eventId=${eventId}`, { cache: 'no-store' });
-      if (nr.ok) setNotes(await nr.json());
     } catch {}
   }, [eventId]);
 
@@ -185,6 +176,16 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
     await post('/api/admin/reset', {});
     const list = await refreshEvents(); setEventId(list[0].id); setErr(''); reload();
   };
+  const loadSample = async () => {
+    setTplMsg(null);
+    try {
+      const res = await post(`/api/admin/events/${eventId}/sample`, { template: tpl });
+      let data = {}; try { data = await res.json(); } catch {}
+      if (!res.ok) return setTplMsg({ ok: false, text: data.error || 'Could not load the sample data' });
+      setTplMsg({ ok: true, text: data.added > 0 ? `Added ${data.added} area${data.added === 1 ? '' : 's'} with their cards.` : 'Nothing to add: this event already has all of those areas.' });
+      reload();
+    } catch { setTplMsg({ ok: false, text: 'Could not reach the server.' }); }
+  };
   const addZone = async () => {
     const res = await post('/api/admin/zones', { eventId, name: zoneName, kind: zoneKind });
     if (!res.ok) return setErr((await res.json()).error || 'Could not add area');
@@ -194,31 +195,11 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
     if (!confirm(`Delete the area "${z.name}" and all its cards?`)) return;
     await call('DELETE', `/api/admin/zones/${z.id}`); reload();
   };
-  const addVolunteer = async () => {
-    setVolMsg(null);
-    try {
-      const res = await post('/api/admin/volunteers', vol);
-      let data = {};
-      try { data = await res.json(); } catch {}
-      if (!res.ok) return setVolMsg({ ok: false, text: data.error || 'Could not add the volunteer (server error). Stop the site and run npm run dev again.' });
-      const areaName = snap.zones.find(z => z.id === Number(vol.zoneId))?.name || 'the area';
-      setVolMsg({ ok: true, text: `Added ${vol.name.trim()} to ${areaName}.` });
-      setVol({ name: '', password: '', zoneId: '' });
-      reload();
-    } catch { setVolMsg({ ok: false, text: 'Could not reach the server. Is the site still running?' }); }
-  };
-  const dismissNote = async (n) => { await call('DELETE', `/api/notes/${n.id}`); reload(); };
-  const removeVolunteer = async (v) => { if (confirm(`Remove volunteer "${v.name}"?`)) { await call('DELETE', `/api/admin/volunteers/${v.id}`); reload(); } };
-  const addTask = async () => { await post('/api/admin/tasks', { eventId, text: newTask }); setNewTask(''); reload(); };
-  const toggleTask = async (t) => { await post(`/api/admin/tasks/${t.id}`, { done: !t.done }); reload(); };
-  const removeTask = async (t) => { await call('DELETE', `/api/admin/tasks/${t.id}`); reload(); };
-
-  const broadcast = async (text) => { await post('/api/admin/broadcast', { eventId, message: text }); setMsg(''); reload(); };
+  const gotoEvent = (id) => { setEventId(id); setManageOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const ack = async () => { await post('/api/admin/alerts', { eventId }); reload(); };
   const toggleSound = () => { if (!soundOn) beep(); setSoundOn(!soundOn); };
   const logout = async () => { await post('/api/admin/logout', {}); window.location.reload(); };
   const openAlerts = alerts.filter(a => !a.acknowledged);
-  const todo = tasks(snap.zones);
 
   return (
     <>
@@ -279,82 +260,26 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
           </select>
           <button className="btn primary" disabled={!zoneName.trim()} onClick={addZone}>Add area</button>
         </div>
+        <h3>Load sample data into "{snap.event.name}"</h3>
+        <p className="muted tiny">Adds ready-made areas, cards and parking history, like the demo events. Areas you already have are kept.</p>
+        <div className="row">
+          <select value={tpl} onChange={e => { setTpl(e.target.value); setTplMsg(null); }}>
+            <option value="garba">Garba Night</option><option value="sports">Annual Sports Meet</option>
+            <option value="cultural">Cultural Night</option><option value="tech">Tech Fest 2026</option>
+          </select>
+          <button className="btn primary" onClick={loadSample}>Add sample data</button>
+        </div>
+        {tplMsg && <div className={tplMsg.ok ? 'okmsg' : 'err'}>{tplMsg.text}</div>}
         <div className="row">
           <button className="btn danger small" onClick={deleteEvent}>Delete this event</button>
           {isOwner && <button className="btn danger small" onClick={resetDemo}>Reset everything to sample data</button>}
         </div>
       </details>
 
-      <section className="card todo">
-        <h2>📋 Staff to-do list</h2>
-        {todo.length === 0 ? <div className="muted">Nothing needs attention right now.</div> : (
-          <ol>{todo.map(t => <li key={t.id} className={t.urgent ? 'urgent' : ''}>{t.text}</li>)}</ol>
-        )}
-        <h3 className="tiny muted" style={{ marginTop: 14 }}>Added by you</h3>
-        <ul className="mytasks">
-          {myTasks.map(t => (
-            <li key={t.id} className={t.done ? 'done' : ''}>
-              <input type="checkbox" style={{ flex: 'none', minWidth: 0 }} checked={!!t.done} onChange={() => toggleTask(t)} />
-              <span>{t.text}</span>
-              <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => removeTask(t)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-        <div className="row">
-          <input value={newTask} maxLength={160} placeholder="Write a task for staff, e.g. Bring extra chairs to Hall B"
-            onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && newTask.trim() && addTask()} />
-          <button className="btn primary" disabled={!newTask.trim()} onClick={addTask}>Add task</button>
-        </div>
-      </section>
-
-      <section className="card volunteers">
-        <h2>👥 Volunteers ({vols.length})</h2>
-        <p className="muted tiny">A volunteer can update only the cards in their own area. They log in on this same /admin page using "I'm a volunteer".</p>
-        {vols.length === 0 ? <div className="muted">No volunteers added yet.</div> : (
-          <ul className="mytasks">
-            {vols.map(v => (
-              <li key={v.id}><span>👤 <b>{v.name}</b> → {v.zone}</span>
-                <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => removeVolunteer(v)}>Remove</button></li>
-            ))}
-          </ul>
-        )}
-        <h3 className="tiny muted" style={{ marginTop: 14 }}>Add a volunteer</h3>
-        <div className="row">
-          <input name="new-volunteer-name" {...noFillName} value={vol.name} maxLength={40} placeholder="Volunteer name" onChange={e => setVol({ ...vol, name: e.target.value })} />
-          <input name="new-volunteer-secret" type="password" {...noFillPassword} value={vol.password} placeholder="Password (4+ characters)" onChange={e => setVol({ ...vol, password: e.target.value })} />
-          <select value={vol.zoneId} onChange={e => setVol({ ...vol, zoneId: e.target.value })}>
-            <option value="">Choose area</option>
-            {snap.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-          </select>
-          <button className="btn primary" disabled={!vol.name.trim() || vol.password.length < 4 || !vol.zoneId} onClick={addVolunteer}>Add volunteer</button>
-        </div>
-        {volMsg && <div className={volMsg.ok ? 'okmsg' : 'err'}>{volMsg.text}</div>}
-      </section>
-
-      <section className="card volunteers">
-        <h2>💬 Messages from volunteers ({notes.length})</h2>
-        {notes.length === 0 ? <div className="muted">No messages yet. Volunteers can type notes on their own panel.</div> : (
-          <ul className="mytasks">
-            {notes.map(n => (
-              <li key={n.id}>
-                <span><b>{n.author}</b> · {n.zone} · <span className="muted tiny">{new Date(n.created_at).toLocaleTimeString()}{n.for_visitors ? ' · visible to visitors' : ''}</span><br />{n.text}</span>
-                <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => dismissNote(n)}>Dismiss</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="card zone">
-        <h2>📢 Broadcast to all visitors</h2>
-        {snap.broadcast && <div className="banner">Live now: {snap.broadcast.message}</div>}
-        <div className="row">
-          <input value={msg} maxLength={200} placeholder="e.g. Emergency lane closed - use Gate 2"
-            onChange={e => setMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && msg.trim() && broadcast(msg)} />
-          <button className="btn primary" disabled={!msg.trim()} onClick={() => broadcast(msg)}>Send</button>
-          <button className="btn" onClick={() => broadcast('')}>Clear</button>
-        </div>
-      </section>
+      <TasksSection events={events} defaultEventId={eventId} />
+      <VolunteersSection events={events} defaultEventId={eventId} onGoto={gotoEvent} />
+      <MessagesSection events={events} defaultEventId={eventId} />
+      <BroadcastSection events={events} defaultEventId={eventId} />
 
       {snap.zones.length === 0 && (
         <div className="card empty">This event has no areas yet. Open "⚙️ Manage events and areas" above and add areas such as Main Stage, Parking and Food Court. Then add cards (crowd, parking, waste, power) to each area.</div>
