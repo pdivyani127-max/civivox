@@ -6,16 +6,24 @@ import { call, post } from './api';
 import { noFillName, noFillPassword } from '@/lib/noautofill';
 
 export default function VolunteersSection({ events, defaultEventId, onGoto }) {
-  const [eid, setEid] = useChosenEvent(defaultEventId, events);
+  const [eid, setEid] = useChosenEvent(defaultEventId, events, true);
   const [snap] = useEventSnap(eid);
   const [vols, setVols] = useState([]);
   const [f, setF] = useState({ name: '', password: '', zoneId: '' });
   const [msg, setMsg] = useState(null);
   const zones = snap ? snap.zones : [];
+  const all = eid === 'all';
 
   const load = useCallback(async () => {
-    try { const r = await fetch(`/api/admin/volunteers?eventId=${eid}`, { cache: 'no-store' }); if (r.ok) setVols(await r.json()); } catch {}
-  }, [eid]);
+    try {
+      const targets = all ? events : events.filter(e => e.id === eid);
+      const parts = await Promise.all(targets.map(async (e) => {
+        const r = await fetch(`/api/admin/volunteers?eventId=${e.id}`, { cache: 'no-store' });
+        return r.ok ? (await r.json()).map(v => ({ ...v, eventName: e.name })) : [];
+      }));
+      setVols(parts.flat());
+    } catch {}
+  }, [eid, events, all]);
   useEffect(() => { setVols([]); load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [load]);
   useEffect(() => { setF((x) => ({ ...x, zoneId: '' })); setMsg(null); }, [eid]); // an area belongs to one event only
 
@@ -36,16 +44,20 @@ export default function VolunteersSection({ events, defaultEventId, onGoto }) {
   return (
     <section className="card volunteers">
       <h2>👥 Volunteers ({vols.length})</h2>
-      <EventPick events={events} value={eid} onChange={setEid} />
+      <EventPick events={events} value={eid} onChange={setEid} allowAll />
       <p className="muted tiny">A volunteer can update only the cards in their own area, in the event chosen above. They log in on the sign-in page using "Volunteer".</p>
       {vols.length === 0 ? <div className="muted">No volunteers added for this event yet.</div> : (
         <ul className="mytasks">
           {vols.map(v => (
-            <li key={v.id}><span>👤 <b>{v.name}</b> → {v.zone}</span>
+            <li key={v.id}><span>👤 <b>{v.name}</b> → {all && <>{v.eventName} · </>}{v.zone}</span>
               <button className="linkbtn" style={{ marginTop: 0 }} onClick={() => remove(v)}>Remove</button></li>
           ))}
         </ul>
       )}
+      {all ? (
+        <div className="muted tiny" style={{ marginTop: 14 }}>To add a volunteer, choose one event above.</div>
+      ) : (
+        <>
       <h3 className="tiny muted" style={{ marginTop: 14 }}>Add a volunteer to {snap ? `"${snap.event.name}"` : 'this event'}</h3>
       {snap && zones.length === 0 ? (
         <div className="pending">
@@ -62,6 +74,8 @@ export default function VolunteersSection({ events, defaultEventId, onGoto }) {
           </select>
           <button className="btn primary" disabled={!f.name.trim() || f.password.length < 4 || !f.zoneId} onClick={add}>Add volunteer</button>
         </div>
+      )}
+        </>
       )}
       {msg && <div className={msg.ok ? 'okmsg' : 'err'}>{msg.text}</div>}
     </section>
