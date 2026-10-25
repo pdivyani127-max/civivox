@@ -1,8 +1,10 @@
 'use client';
 import { useState } from 'react';
 import SampleLetter from './SampleLetter';
+import LoginScene from './LoginScene';
 import { noFillName, noFillPassword } from '@/lib/noautofill';
 
+const WHO = { volunteer: 'volunteer', organizer: 'organizer', owner: 'site owner' };
 const TITLES = { volunteer: 'Volunteer login', organizer: 'Organizer', owner: 'Site owner login' };
 
 export default function LoginForm({ role, demoMode }) {
@@ -45,56 +47,64 @@ export default function LoginForm({ role, demoMode }) {
   }
 
   return (
-    <>
-      <form className="card login wide" onSubmit={onSubmit} autoComplete="off">
-        <a href="/start" className="back">← Choose your role</a>
-        <h1>{signup ? 'Create organizer account' : TITLES[role]}</h1>
-        {role === 'organizer' && (
-          <div className="tabs">
-            <button type="button" className={mode === 'signin' ? 'tab on' : 'tab'} onClick={() => { setMode('signin'); setErr(''); }}>Sign in</button>
-            <button type="button" className={mode === 'signup' ? 'tab on' : 'tab'} onClick={() => { setMode('signup'); setErr(''); }}>Create account</button>
-          </div>
-        )}
-        <p className="muted">
-          {role === 'volunteer' && 'Use the name and password your organizer gave you.'}
-          {role === 'owner' && 'For the person who runs this website.'}
-          {role === 'organizer' && !signup && 'Sign in with the organizer name and password you created.'}
-          {signup && 'Tell us about your event. You will add areas, volunteers and live updates after this.'}
-        </p>
+    <div className="lg bleed">
+      <div className="lg-shell">
+        <LoginScene role={role} />
+        <form className="lg-form" onSubmit={onSubmit} autoComplete="off">
+          <div className="lg-top"><a href="/start" className="lg-back">← Choose your role</a></div>
+          <p className="lg-kicker">{signup ? 'Create organizer account' : TITLES[role]}</p>
+          <h1 className="lg-h1">{signup ? <>Set up <em>your event</em></> : <>Hi, <em>{WHO[role]}</em></>}</h1>
+          {role === 'organizer' && (
+            <div className="tabs">
+              <button type="button" className={mode === 'signin' ? 'tab on' : 'tab'} onClick={() => { setMode('signin'); setErr(''); }}>Sign in</button>
+              <button type="button" className={mode === 'signup' ? 'tab on' : 'tab'} onClick={() => { setMode('signup'); setErr(''); }}>Create account</button>
+            </div>
+          )}
+          <p className="lg-sub">
+            {role === 'volunteer' && 'Use the name and password your organizer gave you.'}
+            {role === 'owner' && 'For the person who runs this website.'}
+            {role === 'organizer' && !signup && 'Sign in with the organizer name and password you created.'}
+            {signup && 'Tell us about your event. You will add areas, volunteers and live updates after this.'}
+          </p>
 
-        {needName && <input name="name" {...noFillName} placeholder={role === 'organizer' ? 'Your name or organization' : 'Your name'} />}
-        <input name="password" type={pwType} {...noFillPassword} placeholder="Password" />
+          {needName && <input name="name" {...noFillName} placeholder={role === 'organizer' ? 'Your name or organization' : 'Your name'} />}
+          <input name="password" type={pwType} {...noFillPassword} placeholder="Password" />
 
-        {signup && (
-          <>
-            <input name="confirm" type={pwType} {...noFillPassword} placeholder="Confirm password (6+ characters)" />
-            <input name="eventName" autoComplete="off" placeholder="Event name" />
-            <input name="venue" autoComplete="off" placeholder="Venue (optional)" />
-            <label className="filebox">
-              <span>Permission letter (PDF, PNG or JPG, max 2 MB)</span>
-              <input name="letter" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                onChange={e => setHasFile(!!e.target.files?.length)} />
-            </label>
-            {demoMode && (
-              <div className="check">
-                <input id="demoLetter" name="demoLetter" value="1" type="checkbox" disabled={hasFile} />
-                <label htmlFor="demoLetter">This is the sample letter or permission letter format</label>
-                <button type="button" className="linkish" onClick={() => setSample(true)}>View it</button>
-              </div>
-            )}
-          </>
-        )}
+          {signup && (
+            <>
+              <input name="confirm" type={pwType} {...noFillPassword} placeholder="Confirm password (6+ characters)" />
+              <input name="eventName" autoComplete="off" placeholder="Event name" />
+              <input name="venue" autoComplete="off" placeholder="Venue (optional)" />
+              <label className="filebox">
+                <span>Permission letter (PDF, PNG or JPG, max 2 MB)</span>
+                <input name="letter" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  onChange={e => setHasFile(!!e.target.files?.length)} />
+              </label>
+              {demoMode && (
+                <div className="check">
+                  <input id="demoLetter" name="demoLetter" value="1" type="checkbox" disabled={hasFile} />
+                  <label htmlFor="demoLetter">This is the sample letter or permission letter format</label>
+                  <button type="button" className="linkish" onClick={() => setSample(true)}>View it</button>
+                </div>
+              )}
+            </>
+          )}
 
-        <label className="check small">
-          <input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />
-          <span>Show password</span>
-        </label>
+          <label className="check small">
+            <input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />
+            <span>Show password</span>
+          </label>
 
-        <button type="submit" className="btn primary" disabled={busy}>
-          {busy ? 'Please wait...' : signup ? 'Create account' : 'Log in'}
-        </button>
-        {err && <div className="err">{err}</div>}
-      </form>
+          <button type="submit" className="btn primary" disabled={busy}>
+            {busy ? 'Please wait...' : signup ? 'Create account' : 'Log in'}
+          </button>
+          {err && <div className="err">{err}</div>}
+
+          {role === 'volunteer' && <p className="lg-foot">No account yet? Ask your organizer for a name and password.</p>}
+          {role === 'organizer' && !signup && <p className="lg-foot">New here? <button type="button" className="linkish" onClick={() => { setMode('signup'); setErr(''); }}>Create an account</button></p>}
+          {signup && <p className="lg-foot">Already have an account? <button type="button" className="linkish" onClick={() => { setMode('signin'); setErr(''); }}>Sign in</button></p>}
+        </form>
+      </div>
 
       {sample && (
         <div className="modal" onClick={() => setSample(false)}>
@@ -111,6 +121,6 @@ export default function LoginForm({ role, demoMode }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
