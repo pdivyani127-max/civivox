@@ -31,7 +31,7 @@ export default function VolunteerPanel({ session, initial }) {
     } catch { setMsg({ ok: false, text: 'Could not reach the server.' }); }
   };
   const remove = async (n) => { await fetch(`/api/notes/${n.id}`, { method: 'DELETE' }); reload(); };
-  const logout = async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.reload(); };
+  
 
   const zone = snap.zones.find(z => z.id === session.zoneId);
   const todo = zone ? tasks([zone]) : [];
@@ -43,7 +43,7 @@ export default function VolunteerPanel({ session, initial }) {
           <h1>Volunteer panel</h1>
           <div className="muted">{session.name} · {zone ? zone.name : 'area'} · {snap.event.name}</div>
         </div>
-        <button className="btn" onClick={logout}>Log out</button>
+        
       </div>
 
       {snap.broadcast && <div className="banner">📢 {snap.broadcast.message}</div>}

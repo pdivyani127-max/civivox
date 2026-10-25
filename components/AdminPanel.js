@@ -198,7 +198,7 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
   const gotoEvent = (id) => { setEventId(id); setManageOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const ack = async () => { await post('/api/admin/alerts', { eventId }); reload(); };
   const toggleSound = () => { if (!soundOn) beep(); setSoundOn(!soundOn); };
-  const logout = async () => { await post('/api/admin/logout', {}); window.location.reload(); };
+  
   const openAlerts = alerts.filter(a => !a.acknowledged);
 
   return (
@@ -211,7 +211,7 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
         <div className="row">
           <button className={`btn ${simOn ? 'primary' : ''}`} onClick={() => setSimOn(!simOn)}>{simOn ? '▶ Simulation: ON' : '⏸ Simulation: OFF'}</button>
           <button className="btn" onClick={toggleSound}>{soundOn ? '🔔 Alert sound: ON' : '🔕 Alert sound: OFF'}</button>
-          <button className="btn" onClick={logout}>Log out</button>
+          
         </div>
       </div>
       {account.status === 'pending' && <div className="pending">⏳ Your account is waiting for approval. You can set everything up, but visitors cannot see your events yet.</div>}
