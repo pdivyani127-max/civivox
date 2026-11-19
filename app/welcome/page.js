@@ -54,7 +54,7 @@ export default function Welcome() {
       <section className="w-hero bleed">
         <div className="w-hero-in">
           <div className="w-copy">
-            <p className="eyebrow w-rise" style={{ '--i': 0 }}>{SITE_NAME} · live event companion</p>
+            <p className="eyebrow w-rise" style={{ '--i': 0 }}>Live event companion</p>
             <h1 className="w-h1">
               <span className="w-line"><span style={{ '--i': 1 }}>Know before</span></span>
               <span className="w-line"><span style={{ '--i': 2 }}>you <em>go.</em></span></span>
@@ -93,7 +93,7 @@ export default function Welcome() {
         <div className="w-head reveal">
           <Sparkle className="inline" />
           <h2>Explore your event at a glance</h2>
-          <p>Three things people worry about most, answered before they leave home.</p>
+          <p>Answers before you leave home.</p>
         </div>
         <div className="w-circles">
           <article className="w-cat reveal d1">
@@ -162,9 +162,8 @@ export default function Welcome() {
           <Sparkle className="s1" /><Sparkle className="s3" />
         </div>
         <div className="w-scan-text reveal d1">
-          <p className="eyebrow">Zero friction</p>
-          <h2>No app.<br />No login.<br />Just scan.</h2>
-          <p className="w-scan-p">Point your phone camera at a {SITE_NAME} code and the live page opens in your browser. That is all there is to it.</p>
+          <h2>Just<br />scan.</h2>
+          <p className="w-scan-p">Point your camera at a {SITE_NAME} code. The live page opens in your browser.</p>
           <Link href="/events" className="ghost dark">See an event →</Link>
         </div>
       </section>
@@ -192,7 +191,7 @@ export default function Welcome() {
 
       {/* FOOTER */}
       <footer className="foot bleed">
-        <Hills className="hills-top" fill="#2d4f3d" edge="#3f6b4f" variant={3} />
+        <Hills className="hills-top" fill="#14221d" edge="#22372f" variant={3} />
         <div className="foot-body">
           <div className="foot-brand"><b>{SITE_NAME}</b><span>{SITE_TAGLINE}</span></div>
           <nav className="foot-links">

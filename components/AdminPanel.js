@@ -7,6 +7,9 @@ import TasksSection from './TasksSection';
 import VolunteersSection from './VolunteersSection';
 import MessagesSection from './MessagesSection';
 import BroadcastSection from './BroadcastSection';
+import { PhoneQR, Cloud } from './art';
+import { Sparkle } from './Deco';
+import { worstStatus } from '@/lib/insights';
 
 const call = (method, url, body) => fetch(url, {
   method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
@@ -104,6 +107,17 @@ function AddCard({ zone, reload }) {
   );
 }
 
+const NAV = [['og-setup', 'Set up'], ['og-todo', 'To-do'], ['og-vol', 'Volunteers'], ['og-msg', 'Messages'], ['og-bc', 'Broadcast'], ['og-areas', 'Live areas']];
+
+function GroupHead({ no, tone, title, text }) {
+  return (
+    <div className={`og-gh ${tone}`}>
+      <span className="og-no">{no}</span>
+      <div><h2>{title}</h2><p>{text}</p></div>
+    </div>
+  );
+}
+
 export default function AdminPanel({ events: initialEvents, initial, role = 'admin', account = { name: 'Site owner', status: 'approved' } }) {
   const isOwner = role === 'admin';
   const [events, setEvents] = useState(initialEvents);
@@ -122,6 +136,15 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
   const lastCount = useRef(null);
   const soundRef = useRef(false);
   soundRef.current = soundOn;
+  const [active, setActive] = useState('og-setup');
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setActive(e.target.id); });
+    }, { rootMargin: '-35% 0px -60% 0px' });
+    NAV.forEach(([id]) => { const el = document.getElementById(id); if (el) io.observe(el); });
+    return () => io.disconnect();
+  }, []);
 
   const beep = () => {
     try {
@@ -198,22 +221,39 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
   const gotoEvent = (id) => { setEventId(id); setManageOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const ack = async () => { await post('/api/admin/alerts', { eventId }); reload(); };
   const toggleSound = () => { if (!soundOn) beep(); setSoundOn(!soundOn); };
-  
   const openAlerts = alerts.filter(a => !a.acknowledged);
+  const allCards = snap.zones.flatMap(z => z.resources);
+  const cnt = { green: allCards.filter(r => r.status === 'green').length, yellow: allCards.filter(r => r.status === 'yellow').length, red: allCards.filter(r => r.status === 'red').length };
 
   return (
-    <>
-      <div className="row between">
-        <div>
-          <h1>{isOwner ? 'Site owner panel' : 'Organizer panel'}</h1>
-          <div className="muted">{account.name}</div>
+    <div className="og">
+      <header className="og-hero">
+        <i className="og-blob b1" /><i className="og-blob b2" />
+        <div className="og-hero-in">
+          <div className="og-hero-text">
+            <span className="og-eyebrow">Welcome back, {account.name}</span>
+            <h1>{isOwner ? 'Site owner panel' : 'Organizer panel'}</h1>
+            <p className="og-lead">Managing <b>{snap.event.name}</b></p>
+            <div className="og-bar">
+              <label className="og-field"><span>Event</span>
+                <select value={eventId} onChange={e => setEventId(Number(e.target.value))}>
+                  {events.map(e => <option key={e.id} value={e.id}>{e.name}{e.date ? ` · ${e.date}` : ''}</option>)}
+                </select>
+              </label>
+              <a className="og-visit" href={`/event/${eventId}`} target="_blank">Open visitor page ↗</a>
+            </div>
+            <div className="og-toggles">
+              <button className={`btn ${simOn ? 'primary' : ''}`} onClick={() => setSimOn(!simOn)}>{simOn ? '▶ Simulation: ON' : '⏸ Simulation: OFF'}</button>
+              <button className="btn" onClick={toggleSound}>{soundOn ? '🔔 Alert sound: ON' : '🔕 Alert sound: OFF'}</button>
+            </div>
+          </div>
+          <div className="og-hero-art" aria-hidden="true">
+            <div className="og-arch"><Cloud className="cloud" /><PhoneQR className="og-phone" /></div>
+            <Sparkle className="s1" /><Sparkle className="s2" />
+          </div>
         </div>
-        <div className="row">
-          <button className={`btn ${simOn ? 'primary' : ''}`} onClick={() => setSimOn(!simOn)}>{simOn ? '▶ Simulation: ON' : '⏸ Simulation: OFF'}</button>
-          <button className="btn" onClick={toggleSound}>{soundOn ? '🔔 Alert sound: ON' : '🔕 Alert sound: OFF'}</button>
-          
-        </div>
-      </div>
+      </header>
+
       {account.status === 'pending' && <div className="pending">⏳ Your account is waiting for approval. You can set everything up, but visitors cannot see your events yet.</div>}
       {isOwner && <OrganizerAccounts />}
       {simOn && <div className="offline">Simulation is ON: parking, bins, power and crowd levels change with fake data (labelled "Simulated"). Turn it off for real use.</div>}
@@ -228,73 +268,91 @@ export default function AdminPanel({ events: initialEvents, initial, role = 'adm
         </div>
       )}
 
-      <div className="row">
-        <label>Event:&nbsp;</label>
-        <select value={eventId} onChange={e => setEventId(Number(e.target.value))}>
-          {events.map(e => <option key={e.id} value={e.id}>{e.name}{e.date ? ` · ${e.date}` : ''}</option>)}
-        </select>
-        <a className="back" href={`/event/${eventId}`} target="_blank">Open visitor page ↗</a>
+      <div className="og-stats">
+        <div className="og-stat s-areas"><b>{snap.zones.length}</b><span>Areas</span></div>
+        <div className="og-stat s-green"><b>{cnt.green}</b><span>Normal</span></div>
+        <div className="og-stat s-yellow"><b>{cnt.yellow}</b><span>Busy</span></div>
+        <div className={`og-stat s-red ${cnt.red ? 'hot' : ''}`}><b>{cnt.red}</b><span>Need attention</span></div>
       </div>
 
-      <QrPanel eventId={eventId} eventName={snap.event.name} />
+      <nav className="og-nav" aria-label="Sections">
+        {NAV.map(([id, label]) => <a key={id} href={`#${id}`} className={active === id ? 'on' : ''}>{label}</a>)}
+      </nav>
 
-      <details className="card manage" open={manageOpen} onToggle={e => setManageOpen(e.currentTarget.open)}>
-        <summary>⚙️ Manage events and areas</summary>
-        {err && <div className="err">{err}</div>}
-        <h3>Add a new event</h3>
-        <div className="row">
-          <input value={ev.name} maxLength={80} placeholder="Event name" onChange={e => setEv({ ...ev, name: e.target.value })} />
-          <input value={ev.venue} maxLength={80} placeholder="Venue" onChange={e => setEv({ ...ev, venue: e.target.value })} />
-          <input type="date" value={ev.date} onChange={e => setEv({ ...ev, date: e.target.value })} />
-        </div>
-        <div className="row">
-          <input value={ev.description} maxLength={200} placeholder="Short description" onChange={e => setEv({ ...ev, description: e.target.value })} />
-          <button className="btn primary" disabled={!ev.name.trim()} onClick={createEvent}>Create event</button>
-        </div>
-        <h3>Add an area to "{snap.event.name}"</h3>
-        <div className="row">
-          <input value={zoneName} maxLength={60} placeholder="Area name, e.g. Main Stage, Parking Lot C" onChange={e => setZoneName(e.target.value)} />
-          <select value={zoneKind} onChange={e => setZoneKind(e.target.value)}>
-            <option value="hall">Hall / stage</option><option value="parking">Parking</option>
-            <option value="food">Food / stalls</option><option value="other">Other</option>
-          </select>
-          <button className="btn primary" disabled={!zoneName.trim()} onClick={addZone}>Add area</button>
-        </div>
-        <h3>Load sample data into "{snap.event.name}"</h3>
-        <p className="muted tiny">Adds ready-made areas, cards and parking history, like the demo events. Areas you already have are kept.</p>
-        <div className="row">
-          <select value={tpl} onChange={e => { setTpl(e.target.value); setTplMsg(null); }}>
-            <option value="garba">Garba Night</option><option value="sports">Annual Sports Meet</option>
-            <option value="cultural">Cultural Night</option><option value="tech">Tech Fest 2026</option>
-          </select>
-          <button className="btn primary" onClick={loadSample}>Add sample data</button>
-        </div>
-        {tplMsg && <div className={tplMsg.ok ? 'okmsg' : 'err'}>{tplMsg.text}</div>}
-        <div className="row">
-          <button className="btn danger small" onClick={deleteEvent}>Delete this event</button>
-          {isOwner && <button className="btn danger small" onClick={resetDemo}>Reset everything to sample data</button>}
-        </div>
-      </details>
+      <section id="og-setup" className="og-group">
+        <GroupHead no="01" tone="pink" title="Set up" text="QR code, events, areas and cards." />
+        <div className="og-stack">
+          <QrPanel eventId={eventId} eventName={snap.event.name} />
 
-      <TasksSection events={events} defaultEventId={eventId} />
-      <VolunteersSection events={events} defaultEventId={eventId} onGoto={gotoEvent} />
-      <MessagesSection events={events} defaultEventId={eventId} />
-      <BroadcastSection events={events} defaultEventId={eventId} />
+          <details className="card manage" open={manageOpen} onToggle={e => setManageOpen(e.currentTarget.open)}>
+            <summary>⚙️ Manage events and areas</summary>
+            {err && <div className="err">{err}</div>}
+            <h3>Add a new event</h3>
+            <div className="row">
+              <input value={ev.name} maxLength={80} placeholder="Event name" onChange={e => setEv({ ...ev, name: e.target.value })} />
+              <input value={ev.venue} maxLength={80} placeholder="Venue" onChange={e => setEv({ ...ev, venue: e.target.value })} />
+              <input type="date" value={ev.date} onChange={e => setEv({ ...ev, date: e.target.value })} />
+            </div>
+            <div className="row">
+              <input value={ev.description} maxLength={200} placeholder="Short description" onChange={e => setEv({ ...ev, description: e.target.value })} />
+              <button className="btn primary" disabled={!ev.name.trim()} onClick={createEvent}>Create event</button>
+            </div>
+            <h3>Add an area to "{snap.event.name}"</h3>
+            <div className="row">
+              <input value={zoneName} maxLength={60} placeholder="Area name, e.g. Main Stage, Parking Lot C" onChange={e => setZoneName(e.target.value)} />
+              <select value={zoneKind} onChange={e => setZoneKind(e.target.value)}>
+                <option value="hall">Hall / stage</option><option value="parking">Parking</option>
+                <option value="food">Food / stalls</option><option value="other">Other</option>
+              </select>
+              <button className="btn primary" disabled={!zoneName.trim()} onClick={addZone}>Add area</button>
+            </div>
+            <h3>Load sample data into "{snap.event.name}"</h3>
+            <p className="muted tiny">Adds ready-made areas, cards and parking history, like the demo events. Areas you already have are kept.</p>
+            <div className="row">
+              <select value={tpl} onChange={e => { setTpl(e.target.value); setTplMsg(null); }}>
+                <option value="garba">Garba Night</option><option value="sports">Annual Sports Meet</option>
+                <option value="cultural">Cultural Night</option><option value="tech">Tech Fest 2026</option>
+              </select>
+              <button className="btn primary" onClick={loadSample}>Add sample data</button>
+            </div>
+            {tplMsg && <div className={tplMsg.ok ? 'okmsg' : 'err'}>{tplMsg.text}</div>}
+            <div className="row">
+              <button className="btn danger small" onClick={deleteEvent}>Delete this event</button>
+              {isOwner && <button className="btn danger small" onClick={resetDemo}>Reset everything to sample data</button>}
+            </div>
+          </details>
+        </div>
+      </section>
 
-      {snap.zones.length === 0 && (
-        <div className="card empty">This event has no areas yet. Open "⚙️ Manage events and areas" above and add areas such as Main Stage, Parking and Food Court. Then add cards (crowd, parking, waste, power) to each area.</div>
-      )}
+      <section className="og-group">
+        <GroupHead no="02" tone="sage" title="Run the event" text="Your team, their messages and your visitors." />
+        <div className="og-stack">
+          <div id="og-todo" className="og-anchor"><TasksSection events={events} defaultEventId={eventId} /></div>
+          <div id="og-vol" className="og-anchor"><VolunteersSection events={events} defaultEventId={eventId} onGoto={gotoEvent} /></div>
+          <div id="og-msg" className="og-anchor"><MessagesSection events={events} defaultEventId={eventId} /></div>
+          <div id="og-bc" className="og-anchor"><BroadcastSection events={events} defaultEventId={eventId} /></div>
+        </div>
+      </section>
 
-      {snap.zones.map(z => (
-        <section key={z.id} className="zone">
-          <div className="zonehead">
-            <h2>{z.name}</h2>
-            <button className="btn danger small" onClick={() => deleteZone(z)}>Delete area</button>
-          </div>
-          <div className="grid admin-grid">{z.resources.map(r => <ResourceControl key={r.id} r={r} reload={reload} />)}</div>
-          <AddCard zone={z} reload={reload} />
-        </section>
-      ))}
-    </>
+      <section id="og-areas" className="og-group">
+        <GroupHead no="03" tone="gold" title="Live areas" text="Tap a status to update visitors within seconds." />
+        <div className="og-stack">
+          {snap.zones.length === 0 && (
+            <div className="card empty">This event has no areas yet. Open "⚙️ Manage events and areas" above and add areas such as Main Stage, Parking and Food Court. Then add cards (crowd, parking, waste, power) to each area.</div>
+          )}
+          {snap.zones.map((z, i) => (
+            <section key={z.id} className="og-zone">
+              <div className="og-zonehead">
+                <span className={`og-zn ${worstStatus(z.resources)}`}>{i + 1}</span>
+                <h2>{z.name}</h2>
+                <button className="btn danger small" onClick={() => deleteZone(z)}>Delete area</button>
+              </div>
+              <div className="grid admin-grid">{z.resources.map(r => <ResourceControl key={r.id} r={r} reload={reload} />)}</div>
+              <AddCard zone={z} reload={reload} />
+            </section>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

@@ -50,7 +50,7 @@ export default function Events() {
       <header className="ev-head">
         <Sparkle className="inline" />
         <h1 className="w-h1 ev-h1"><span className="w-line"><span style={{ '--i': 0 }}>Choose an <em>event</em></span></span></h1>
-        <p className="w-lead ev-sub w-rise" style={{ '--i': 2 }}>No app, no login. Pick an event to see live crowd, parking, waste and power status.</p>
+        <p className="w-lead ev-sub w-rise" style={{ '--i': 2 }}>Pick an event to see it live.</p>
       </header>
 
       <div className="ev-list">

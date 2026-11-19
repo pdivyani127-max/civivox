@@ -52,7 +52,6 @@ export default function LoginForm({ role, demoMode }) {
         <LoginScene role={role} />
         <form className="lg-form" onSubmit={onSubmit} autoComplete="off">
           <div className="lg-top"><a href="/start" className="lg-back">← Choose your role</a></div>
-          <p className="lg-kicker">{signup ? 'Create organizer account' : TITLES[role]}</p>
           <h1 className="lg-h1">{signup ? <>Set up <em>your event</em></> : <>Hi, <em>{WHO[role]}</em></>}</h1>
           {role === 'organizer' && (
             <div className="tabs">
@@ -60,12 +59,7 @@ export default function LoginForm({ role, demoMode }) {
               <button type="button" className={mode === 'signup' ? 'tab on' : 'tab'} onClick={() => { setMode('signup'); setErr(''); }}>Create account</button>
             </div>
           )}
-          <p className="lg-sub">
-            {role === 'volunteer' && 'Use the name and password your organizer gave you.'}
-            {role === 'owner' && 'For the person who runs this website.'}
-            {role === 'organizer' && !signup && 'Sign in with the organizer name and password you created.'}
-            {signup && 'Tell us about your event. You will add areas, volunteers and live updates after this.'}
-          </p>
+          {role === 'volunteer' && <p className="lg-sub">Your organizer gives you a name and password.</p>}
 
           {needName && <input name="name" {...noFillName} placeholder={role === 'organizer' ? 'Your name or organization' : 'Your name'} />}
           <input name="password" type={pwType} {...noFillPassword} placeholder="Password" />
@@ -100,7 +94,6 @@ export default function LoginForm({ role, demoMode }) {
           </button>
           {err && <div className="err">{err}</div>}
 
-          {role === 'volunteer' && <p className="lg-foot">No account yet? Ask your organizer for a name and password.</p>}
           {role === 'organizer' && !signup && <p className="lg-foot">New here? <button type="button" className="linkish" onClick={() => { setMode('signup'); setErr(''); }}>Create an account</button></p>}
           {signup && <p className="lg-foot">Already have an account? <button type="button" className="linkish" onClick={() => { setMode('signin'); setErr(''); }}>Sign in</button></p>}
         </form>

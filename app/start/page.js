@@ -26,7 +26,6 @@ export default async function Home() {
       <div className="r-orb"><Orbit /></div>
       <Sparkle className="s1" /><Sparkle className="s2" /><Sparkle className="s3" />
       <div className="r-in">
-        <p className="eyebrow w-rise" style={{ '--i': 0 }}>Sign in to {SITE_NAME}</p>
         <h1 className="w-h1 r-h1">
           <span className="w-line"><span style={{ '--i': 1 }}>Welcome to</span></span>
           <span className="w-line"><span style={{ '--i': 2 }}><em>{SITE_NAME}</em></span></span>
